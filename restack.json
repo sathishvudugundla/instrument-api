@@ -1,0 +1,5 @@
+{
+  "type": "fastapi",
+  "entrypoint": "app.main:app",
+  "port": 8000
+}

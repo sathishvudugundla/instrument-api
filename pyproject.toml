@@ -1,0 +1,14 @@
+[project]
+name = "instrument-api"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "librosa",
+    "numpy",
+    "soundfile",
+    "tensorflow"
+]
+
+[tool.uv]
+include = ["services/instrument-api"]

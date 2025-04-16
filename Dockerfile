@@ -42,3 +42,4 @@ RUN uv sync --no-dev
 
 EXPOSE 8000
 CMD ["uv", "run", "services/instrument-api/main.py"]
+

@@ -1,14 +1,15 @@
 [project]
 name = "instrument-api"
 version = "0.1.0"
+description = "Instrument recognition API"
+requires-python = ">=3.10"
+
 dependencies = [
     "fastapi",
-    "uvicorn",
+    "uvicorn[standard]",
     "librosa",
     "numpy",
-    "soundfile",
-    "tensorflow"
+    "tensorflow",
+    "python-multipart",
+    "pydantic"
 ]
-
-[tool.uv]
-include = ["services/instrument-api"]

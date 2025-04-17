@@ -1,15 +1,16 @@
-FROM ghcr.io/astral-sh/uv:python3.10-bookworm-slim
+FROM python:3.10-slim
+
+# Install required system packages for librosa and TensorFlow
+RUN apt-get update && apt-get install -y \
+    ffmpeg libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY pyproject.toml ./
-
 COPY . .
 
-# Install dependencies
-RUN uv sync --no-dev
+# Install uv tool to sync, OR use pip if uv is not needed
+RUN pip install --upgrade pip && pip install uvicorn[standard] fastapi librosa numpy tensorflow python-multipart pydantic
 
-# Expose port 80
-EXPOSE 80
-
-CMD ["uv", "run", "services"]
+CMD ["uvicorn", "services.instrument_api.main:app", "--host", "0.0.0.0", "--port", "80"]

@@ -1,0 +1,7 @@
+{
+  "services": {
+    "instrument-api": {
+      "path": "services/instrument_api/main.py"
+    }
+  }
+}

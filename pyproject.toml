@@ -1,15 +1,13 @@
-[project]
+[tool.poetry]
 name = "instrument-api"
 version = "0.1.0"
-description = "Instrument recognition API"
-requires-python = ">=3.10"
+description = "Refactored for Restack deployment"
+authors = ["Your Name <you@example.com>"]
+packages = [{ include = "instrument_apis/src" }]
 
-dependencies = [
-    "fastapi",
-    "uvicorn[standard]",
-    "librosa",
-    "numpy",
-    "tensorflow",
-    "python-multipart",
-    "pydantic"
-]
+[tool.poetry.dependencies]
+python = "^3.10"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

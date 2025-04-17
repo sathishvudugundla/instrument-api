@@ -150,3 +150,8 @@ async def predict_instrument(file: UploadFile = File(...)):
     finally:
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
+
+# Root health check endpoint
+@app.get("/")
+def read_root():
+    return {"message": "Instrument classifier is running 🚀"}

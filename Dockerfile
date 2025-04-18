@@ -59,7 +59,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY ./app ./app
 
 # Default fallback port (in local/dev only)
-ENV PORT=8000
+ENV PORT=8080
 
 # Correct way to run app using shell (so $PORT is interpolated)
 # ENTRYPOINT sh -c "uvicorn app.main:app --host 0.0.0.0 --port \$PORT"

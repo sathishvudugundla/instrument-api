@@ -25,19 +25,8 @@ import soundfile as sf
 import os
 import logging
 
-
 app = FastAPI()
 
-@app.on_event("startup")
-async def startup_event():
-    try:
-        # Dummy data to trigger a dry run
-        dummy_input = np.zeros((1, 13 * 1300))
-        model.predict(dummy_input)
-        print("Model warm-up complete.")
-    except Exception as e:
-        print(f"Error during model warm-up: {e}")
-        
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

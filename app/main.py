@@ -129,7 +129,7 @@ def extract_mfcc(file_path, sr=22050, n_mfcc=13, max_len=1300):
     return mfcc
 
 # Prediction endpoint
-@app.post("/predict-instrument/")
+@app.post("/predict-instrument")
 async def predict_instrument(file: UploadFile = File(...)):
     temp_filename = "temp.wav"
     try:

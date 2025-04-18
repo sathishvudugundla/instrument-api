@@ -1,165 +1,29 @@
-# # app/main.py
-# import numpy as np
-# import librosa
-# from fastapi import FastAPI, UploadFile, File
-# from fastapi.responses import JSONResponse
-# from tensorflow.keras.models import load_model
-# import io
-# import soundfile as sf
-
-# app = FastAPI()
-# model = load_model("app/instrument_model.h5")
-
-# def extract_mfcc(file_data, sr=22050, n_mfcc=13):
-#     audio, _ = sf.read(io.BytesIO(file_data))
-#     audio = librosa.to_mono(audio.T if audio.ndim > 1 else audio)
-#     mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=n_mfcc)
-#     mfcc = mfcc[..., np.newaxis]
-#     mfcc = np.expand_dims(mfcc, axis=0)
-#     return mfcc
-
-# @app.post("/predict-instrument/")
-# async def predict_instrument(file: UploadFile = File(...)):
-#     audio_bytes = await file.read()
-#     try:
-#         mfcc = extract_mfcc(audio_bytes)
-#         prediction = model.predict(mfcc)
-#         predicted_label = np.argmax(prediction)
-#         labels = ["cel", "cla", "flu", "gac", "gel", "org", "pia", "sax", "tru", "vio", "voi"]
-#         return JSONResponse({"instrument": labels[predicted_label]})
-#     except Exception as e:
-#         return JSONResponse(status_code=500, content={"error": str(e)})
-
-# app/main.py
-# import numpy as np
-# import librosa
-# from fastapi import FastAPI, UploadFile, File
-# from fastapi.responses import JSONResponse
-# from tensorflow.keras.models import load_model
-# import shutil
-# import soundfile as sf
-# import os
-
-# app = FastAPI()
-# model = load_model("app/instrument_model.h5")
-# labels = ["cel", "cla", "flu", "gac", "gel", "org", "pia", "sax", "tru", "vio", "voi"]
-
-# def extract_mfcc(file_path, sr=22050, n_mfcc=13, max_len=1300):
-#     audio, _ = librosa.load(file_path, sr=sr, mono=True)
-#     mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=n_mfcc)
-
-#     # Pad or truncate to max_len
-#     if mfcc.shape[1] < max_len:
-#         pad_width = max_len - mfcc.shape[1]
-#         mfcc = np.pad(mfcc, pad_width=((0, 0), (0, pad_width)), mode='constant')
-#     else:
-#         mfcc = mfcc[:, :max_len]
-
-#     return mfcc
-
-# @app.post("/predict-instrument/")
-# async def predict_instrument(file: UploadFile = File(...)):
-#     temp_filename = "temp.wav"
-#     try:
-#         with open(temp_filename, "wb") as buffer:
-#             shutil.copyfileobj(file.file, buffer)
-
-#         mfcc = extract_mfcc(temp_filename, n_mfcc=13, max_len=1300)
-#         mfcc_flat = mfcc.flatten().reshape(1, -1)
-
-#         prediction = model.predict(mfcc_flat)[0]  # Shape: (11,)
-#         instrument_probs = {label: float(score) for label, score in zip(labels, prediction)}
-
-#         return JSONResponse({"instruments": instrument_probs})
-#     except Exception as e:
-#         return JSONResponse(status_code=500, content={"error": str(e)})
-#     finally:
-#         if os.path.exists(temp_filename):
-#             os.remove(temp_filename)
-
 
 import numpy as np
 import librosa
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 from tensorflow.keras.models import load_model
-import shutil
+import io
 import soundfile as sf
-import os
-import logging
-
 
 app = FastAPI()
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-# Load model
-try:
-    model = load_model("app/instrument_model.h5")
-    logger.info("Model loaded successfully.")
-except Exception as e:
-    logger.error(f"Error loading model: {e}")
-    raise
-# Label mappings
-labels = ["cel", "cla", "flu", "gac", "gel", "org", "pia", "sax", "tru", "vio", "voi"]
-full_labels = {
-    "cel": "Cello",
-    "cla": "Clarinet",
-    "flu": "Flute",
-    "gac": "Acoustic Guitar",
-    "gel": "Electric Guitar",
-    "org": "Organ",
-    "pia": "Piano",
-    "sax": "Saxophone",
-    "tru": "Trumpet",
-    "vio": "Violin",
-    "voi": "Voice"
-}
+model = load_model("instrument_model.h5")
 
-# Feature extraction
-def extract_mfcc(file_path, sr=22050, n_mfcc=13, max_len=1300):
-    audio, _ = librosa.load(file_path, sr=sr, mono=True)
+def extract_mfcc(file_data, sr=22050, n_mfcc=13):
+    audio, _ = sf.read(io.BytesIO(file_data))
+    audio = librosa.to_mono(audio.T if audio.ndim > 1 else audio)
     mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=n_mfcc)
+    mfcc_scaled = np.mean(mfcc.T, axis=0)
+    return mfcc_scaled
 
-    if mfcc.shape[1] < max_len:
-        pad_width = max_len - mfcc.shape[1]
-        mfcc = np.pad(mfcc, pad_width=((0, 0), (0, pad_width)), mode='constant')
-    else:
-        mfcc = mfcc[:, :max_len]
-
-    return mfcc
-
-# Prediction endpoint
-@app.post("/predict-instrument/")
-async def predict_instrument(file: UploadFile = File(...)):
-    temp_filename = "temp.wav"
+@app.post("/predict/")
+async def predict(file: UploadFile = File(...)):
     try:
-        with open(temp_filename, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        mfcc = extract_mfcc(temp_filename, n_mfcc=13, max_len=1300)
-        mfcc_flat = mfcc.flatten().reshape(1, -1)
-
-        prediction = model.predict(mfcc_flat)[0]  # Shape: (11,)
-
-        # Set confidence threshold
-        threshold = 0.10
-
-        # Filter instruments with confidence above the threshold
-        filtered_probs = {
-            full_labels[label]: float(score)
-            for label, score in zip(labels, prediction)
-            if score >= threshold
-        }
-
-        return JSONResponse({"instruments": filtered_probs})
+        contents = await file.read()
+        mfccs = extract_mfcc(contents)
+        prediction = model.predict(np.expand_dims(mfccs, axis=0))
+        predicted_class = int(np.argmax(prediction))
+        return JSONResponse(content={"predicted_class": predicted_class})
     except Exception as e:
-        logger.error(f"Error during prediction: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-    finally:
-        if os.path.exists(temp_filename):
-            os.remove(temp_filename)
-
-# Root health check endpoint
-@app.get("/")
-def read_root():
-    return {"message": "Instrument classifier is running 🚀"}
+        return JSONResponse(content={"error": str(e)}, status_code=500)

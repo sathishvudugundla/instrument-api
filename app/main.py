@@ -25,27 +25,7 @@ import soundfile as sf
 import os
 import logging
 
-class LimitUploadSize(BaseHTTPMiddleware):
-    def __init__(self, app, max_upload_size: int):
-        super().__init__(app)
-        self.max_upload_size = max_upload_size  # in bytes
-
-    async def dispatch(self, request: Request, call_next):
-        content_length = request.headers.get('content-length')
-        if content_length and int(content_length) > self.max_upload_size:
-            return JSONResponse(
-                {"error": f"File too large. Max size allowed is {self.max_upload_size / (1024 * 1024)} MB."},
-                status_code=413
-            )
-        return await call_next(request)
-
-# FastAPI instance
 app = FastAPI()
-
-# Apply 100 MB upload size limit
-app.add_middleware(LimitUploadSize, max_upload_size=30 * 1024 * 1024)  # 100MB
-
-# app = FastAPI()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

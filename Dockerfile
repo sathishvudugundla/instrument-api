@@ -62,4 +62,5 @@ COPY ./app ./app
 ENV PORT=8000
 
 # Correct way to run app using shell (so $PORT is interpolated)
-ENTRYPOINT sh -c "uvicorn app.main:app --host 0.0.0.0 --port \$PORT"
+# ENTRYPOINT sh -c "uvicorn app.main:app --host 0.0.0.0 --port \$PORT"
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 300"]

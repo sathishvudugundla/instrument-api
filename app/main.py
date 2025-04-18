@@ -47,16 +47,29 @@ full_labels = {
     "voi": "Voice"
 }
 
-def get_model():
+# def get_model():
+#     global model
+#     if model is None:
+#         try:
+#             model = load_model("app/instrument_model.h5")
+#             logger.info("Model loaded successfully.")
+#         except Exception as e:
+#             logger.error(f"Error loading model: {e}")
+#             raise
+#     return model
+
+# Load model and warm it up
+@app.on_event("startup")
+async def startup_event():
     global model
-    if model is None:
-        try:
-            model = load_model("app/instrument_model.h5")
-            logger.info("Model loaded successfully.")
-        except Exception as e:
-            logger.error(f"Error loading model: {e}")
-            raise
-    return model
+    try:
+        model = load_model("app/instrument_model.h5")
+        dummy_input = np.zeros((1, 13 * 1300))
+        _ = model.predict(dummy_input)
+        logger.info("Model loaded and warm-up complete.")
+    except Exception as e:
+        logger.error(f"Error during model loading or warm-up: {e}")
+        raise e
 
 def extract_mfcc(file_path, sr=22050, n_mfcc=13, max_len=1300):
     audio, _ = librosa.load(file_path, sr=sr, mono=True)

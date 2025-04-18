@@ -1,7 +1,16 @@
+# fastapi
+# uvicorn
+# tensorflow
+# keras
+# python-multipart
+# soundfile
+# numpy
+
 fastapi
-uvicorn
+uvicorn[standard]
 tensorflow
-keras
-python-multipart
-soundfile
 numpy
+librosa
+soundfile
+python-multipart
+

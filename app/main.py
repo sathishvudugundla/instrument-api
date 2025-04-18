@@ -86,12 +86,19 @@ from tensorflow.keras.models import load_model
 import shutil
 import soundfile as sf
 import os
+import logging
+
 
 app = FastAPI()
-
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 # Load model
-model = load_model("app/instrument_model.h5")
-
+try:
+    model = load_model("app/instrument_model.h5")
+    logger.info("Model loaded successfully.")
+except Exception as e:
+    logger.error(f"Error loading model: {e}")
+    raise
 # Label mappings
 labels = ["cel", "cla", "flu", "gac", "gel", "org", "pia", "sax", "tru", "vio", "voi"]
 full_labels = {
@@ -146,6 +153,7 @@ async def predict_instrument(file: UploadFile = File(...)):
 
         return JSONResponse({"instruments": filtered_probs})
     except Exception as e:
+        logger.error(f"Error during prediction: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
     finally:
         if os.path.exists(temp_filename):

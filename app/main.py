@@ -15,39 +15,89 @@
 #         model = load_model("app/instrument_model.h5")
 #     return {"result": "prediction logic here"}
 
-from fastapi import FastAPI, UploadFile, File
 import numpy as np
 import librosa
+from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import JSONResponse
 from tensorflow.keras.models import load_model
+import shutil
+import soundfile as sf
+import os
+import logging
 
 app = FastAPI()
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Lazy load model
 model = None
+labels = ["cel", "cla", "flu", "gac", "gel", "org", "pia", "sax", "tru", "vio", "voi"]
+full_labels = {
+    "cel": "Cello",
+    "cla": "Clarinet",
+    "flu": "Flute",
+    "gac": "Acoustic Guitar",
+    "gel": "Electric Guitar",
+    "org": "Organ",
+    "pia": "Piano",
+    "sax": "Saxophone",
+    "tru": "Trumpet",
+    "vio": "Violin",
+    "voi": "Voice"
+}
 
 def get_model():
     global model
     if model is None:
-        model = load_model("app/instrument_model.h5")
+        try:
+            model = load_model("app/instrument_model.h5")
+            logger.info("Model loaded successfully.")
+        except Exception as e:
+            logger.error(f"Error loading model: {e}")
+            raise
     return model
 
-@app.post("/predict/")
-async def predict(file: UploadFile = File(...)):
-    contents = await file.read()
+def extract_mfcc(file_path, sr=22050, n_mfcc=13, max_len=1300):
+    audio, _ = librosa.load(file_path, sr=sr, mono=True)
+    mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=n_mfcc)
 
-    # Save temp file
-    with open("temp.wav", "wb") as f:
-        f.write(contents)
+    if mfcc.shape[1] < max_len:
+        pad_width = max_len - mfcc.shape[1]
+        mfcc = np.pad(mfcc, pad_width=((0, 0), (0, pad_width)), mode='constant')
+    else:
+        mfcc = mfcc[:, :max_len]
 
-    # Load and preprocess the audio
-    y, sr = librosa.load("temp.wav", sr=None)  # Auto-detect sample rate
-    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
-    padded_mfccs = np.zeros((40, 216))  # Or adjust depending on model input shape
-    padded_mfccs[:, :min(mfccs.shape[1], 216)] = mfccs[:, :min(mfccs.shape[1], 216)]
-    padded_mfccs = np.expand_dims(padded_mfccs, axis=0)
+    return mfcc
 
-    # Get model prediction
-    model = get_model()
-    prediction = model.predict(padded_mfccs)
-    predicted_label = int(np.argmax(prediction))
+@app.post("/predict-instrument")
+async def predict_instrument(file: UploadFile = File(...)):
+    temp_filename = "temp.wav"
+    try:
+        with open(temp_filename, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    return {"result": predicted_label}
+        mfcc = extract_mfcc(temp_filename, n_mfcc=13, max_len=1300)
+        mfcc_flat = mfcc.flatten().reshape(1, -1)
+
+        model_instance = get_model()
+        prediction = model_instance.predict(mfcc_flat)[0]
+
+        threshold = 0.10
+        filtered_probs = {
+            full_labels[label]: float(score)
+            for label, score in zip(labels, prediction)
+            if score >= threshold
+        }
+
+        return JSONResponse({"instruments": filtered_probs})
+    except Exception as e:
+        logger.error(f"Error during prediction: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
+
+@app.get("/")
+def read_root():
+    return {"message": "Instrument classifier is running 🚀"}

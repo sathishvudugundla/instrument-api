@@ -289,7 +289,6 @@
 # @app.get("/")
 # def read_root():
 #     return {"message": "🎶 Instrument classifier is running"}
-
 import os
 import shutil
 import logging
@@ -298,6 +297,7 @@ import librosa
 import soundfile as sf
 import gc
 import psutil
+import threading
 
 from fastapi import FastAPI, UploadFile, File, Request, HTTPException
 from fastapi.responses import JSONResponse
@@ -316,22 +316,38 @@ full_labels = {
     "tru": "Trumpet", "vio": "Violin", "voi": "Voice"
 }
 
+# Singleton model loader with threading lock
+class ModelWrapper:
+    _model = None
+    _lock = threading.Lock()
+
+    @classmethod
+    def get_model(cls):
+        with cls._lock:
+            if cls._model is None:
+                cls._model = load_model("app/instrument_model.h5")
+                logger.info("✅ Model loaded once and cached.")
+            return cls._model
+
 def extract_mfcc(file_path, sr=22050, n_mfcc=13, max_len=1300):
     audio, _ = librosa.load(file_path, sr=sr, mono=True)
     mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=n_mfcc)
-
     if mfcc.shape[1] < max_len:
         pad_width = max_len - mfcc.shape[1]
         mfcc = np.pad(mfcc, pad_width=((0, 0), (0, pad_width)), mode='constant')
     else:
         mfcc = mfcc[:, :max_len]
-
     return mfcc
 
 def log_memory_usage():
     process = psutil.Process(os.getpid())
     mem = process.memory_info().rss / 1024 / 1024
     logger.info(f"📊 Memory usage: {mem:.2f} MB")
+
+def cleanup_resources():
+    K.clear_session()
+    gc.collect()
+    log_memory_usage()
 
 @app.post("/predict-instrument")
 async def predict_instrument(request: Request, file: UploadFile = File(...)):
@@ -341,20 +357,17 @@ async def predict_instrument(request: Request, file: UploadFile = File(...)):
         raise HTTPException(status_code=413, detail="Audio file too large (max 10MB)")
 
     temp_filename = "temp.wav"
-    model_instance = None
     try:
         with open(temp_filename, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
         log_memory_usage()
 
+        # Optional: Move this to background in future
         mfcc = extract_mfcc(temp_filename)
         mfcc_flat = mfcc.flatten().reshape(1, -1)
 
-        # Load model for this request only
-        model_instance = load_model("app/instrument_model.h5")
-        logger.info("✅ Model loaded successfully.")
-
+        model_instance = ModelWrapper.get_model()
         prediction = model_instance.predict(mfcc_flat)[0]
 
         threshold = 0.10
@@ -369,15 +382,11 @@ async def predict_instrument(request: Request, file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"🚨 Prediction error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
     finally:
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
-        # Clean up memory
-        if model_instance:
-            del model_instance  # Explicitly delete the model to free up memory
-        K.clear_session()  # Clear Keras session
-        gc.collect()  # Run garbage collection
-        log_memory_usage()
+        cleanup_resources()
 
 @app.get("/")
 def read_root():

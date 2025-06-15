@@ -13,4 +13,5 @@ numpy
 librosa
 soundfile
 python-multipart
+psutil
 
